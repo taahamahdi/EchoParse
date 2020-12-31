@@ -52,15 +52,15 @@ const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "TR Max Velocity",
 };
 
-const int QUAL_VAL_SIZE = 13;
-const std::string QUALITATIVE_VALS[QUAL_VAL_SIZE] = {
+const int KEY_TEXT_SIZE = 13;
+const std::string KEY_TEXT[KEY_TEXT_SIZE] = {
     "Technical Comments",
     "Left Ventricle",
     "Right Ventricle",
     "Aortic Valve",
     "Mitral Valve",
-    "Tricuspid Vlave",
-    "Pulmonic valve",
+    "Tricuspid Valve",
+    "Pulmonic Valve",
     "Left Atrium",
     "Right Atrium",
     "Pericardium",

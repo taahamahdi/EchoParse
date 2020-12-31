@@ -28,7 +28,7 @@ int main() {
     for (const auto &columnName: KEY_VALS) {
         xlsxiowrite_add_column(*handle, columnName.c_str(), columnName.length());
     }
-    for (const auto &columnName: QUALITATIVE_VALS) {
+    for (const auto &columnName: KEY_TEXT) {
         xlsxiowrite_add_column(*handle, columnName.c_str(), columnName.length());
     }
 
@@ -41,12 +41,15 @@ int main() {
         double *values = new double[KEY_VAL_SIZE];
         fill_n(values, KEY_VAL_SIZE, INT_MIN);
 
+        string *text = new string[KEY_TEXT_SIZE];
+
         duckx::Document doc(file.path());
         doc.open();
 
         duckx::Paragraph mrnParagraph;
 
         bool pastMeasurements = false;
+        string line = "";
         for (auto p : doc.paragraphs()) {
             for (auto r : p.runs()) {
                 if (r.get_text().find("MRN") != string::npos) {
@@ -56,38 +59,66 @@ int main() {
                     pastMeasurements = true;
                 }
             }
-            string line = "";
+            if (pastMeasurements) {
+                line = "";
+            } else if (p.runs().get_text().length() > 0) {
+                const char startLineChar = p.runs().get_text().at(0);
+                // Assumption: A new line begins when the starting character of that line is uppercase.
+                // Reasoning: Some lines in the docx file have unexpected paragraph breaks in random parts
+                // of a KEY_TEXT entry.
+                if (startLineChar >= 'A' && startLineChar <= 'Z') {
+                    line = "";
+                }
+            }
             for (auto r : p.runs()) {
                 line.append(r.get_text());
             }
             if (!pastMeasurements) {
-                // extractText();
+                extractText(text, line);
+            } else {
+                extractVals(values, line);
             }
-            extractVals(values, line);
         }
 
         getMRN(mrnParagraph, handle);
 
         insertVals(values, handle);
+        insertText(text, handle);
         delete[] values;
         xlsxiowrite_next_row(*handle);
     }
     xlsxiowrite_close(*handle);
 }
 
+void insertText(string *text, const xlsxiowriter *handle) {
+    for (int i = 0; i < KEY_TEXT_SIZE; i++) {
+        xlsxiowrite_add_cell_string(*handle, text[i].c_str());
+    }
+}
+
+void extractText(string *text, const string &line) {
+    for (int i = 0; i < KEY_TEXT_SIZE; i++) {
+        // Look only if KEY_TEXT is at start of line
+        if (line.find(KEY_TEXT[i]) == 0) {
+            // Store the line excluding the keyText name
+            // + 2 (colon and space that follow)
+            string entry = line.substr(KEY_TEXT[i].length() + 2);
+            text[i] = entry;
+        }
+    }
+}
+
 void insertVals(double *values, const xlsxiowriter *handle) {
     for (int i = 0; i < KEY_VAL_SIZE; i++) {
-        const double val = values[i];
-        if (val != INT_MIN) {
-            xlsxiowrite_add_cell_float(*handle, val);
-        }
-        else {
+        if (values[i] != INT_MIN) {
+            xlsxiowrite_add_cell_float(*handle, values[i]);
+        } else {
             xlsxiowrite_add_cell_string(*handle, NULL);
         }
     }
 }
 
-void extractVals(double *values, string line) {
+void extractVals(double *values, const string &line) {
     for (int i = 0; i < KEY_VAL_SIZE; i++) {
         if (line.find(KEY_VALS[i]) != string::npos) {
             // Store the line excluding the keyVal name
