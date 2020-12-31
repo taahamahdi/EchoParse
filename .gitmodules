@@ -1,0 +1,15 @@
+[submodule "libs/duckx"]
+	path = libs/duckx
+	url = https://github.com/amiremohamadi/DuckX
+[submodule "libs/minizip"]
+	path = libs/minizip
+	url = https://github.com/nmoinvaz/minizip
+[submodule "libs/pugixml"]
+	path = libs/pugixml
+	url = https://github.com/zeux/pugixml
+[submodule "libs/xlsxio"]
+	path = libs/xlsxio
+	url = https://github.com/brechtsanders/xlsxio
+[submodule "libs/zip"]
+	path = libs/zip
+	url = https://github.com/kuba--/zip
