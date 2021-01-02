@@ -2,7 +2,7 @@
 #define ECHO_H
 
 #include <string>
-#include "libs/duckx/include/duckx.hpp"
+#include "libs/duckx.hpp"
 #include "libs/xlsxio/include/xlsxio_write.h"
 #include "constants.h"
 

@@ -10,7 +10,7 @@
 #include "echoparse.h"
 
 #include "libs/xlsxio/include/xlsxio_write.h"
-#include "libs/duckx/include/duckx.hpp"
+#include "libs/duckx.hpp"
 
 using namespace std;
 
