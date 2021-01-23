@@ -6,13 +6,14 @@ Parses and extracts data from echocardiography reports (in *docx format) to an E
 * `make all`
 
 ## Running EchoParse
-* Copy your reports to EchoParse/input_docs
+* Copy your reports to `EchoParse/input_docs`
 * Set which values you'd like extracted in `constants.h`
+* Run `make all`
 * `./EchoParse`
 * Open the generated `output.xlsx` file in `output/`
 
 ## Improvements to make
-* Replace KEY_VALS and KEY_TEXT with hash tables
+* Replace `KEY_VALS` and `KEY_TEXT` with hash tables
 
 ## Expected format of echocardiography reports
 
