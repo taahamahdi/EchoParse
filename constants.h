@@ -3,27 +3,28 @@
 
 #include <string>
 
-const int KEY_VAL_SIZE = 42;
+const int KEY_VAL_SIZE = 54;
 const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "IVSd",
     "LVPWd",
     "LVIDd",
     "LVIDs)",
+    "LVIDd index",
     "LV FS",
     "LV EF",
     "LV Mass",
+    "LV Mass indexed",
     "LV RWT",
     "LV EDV 2D",
     "LV ESV 2D",
     "LV EDV index",
     "LV ESV index",
     "SV LVOT",
-
+    "Aortic Sinuses",
+    "Aortic Sinuses index",
     "Prox Asc Aorta",
     "Left Atrium (2D)",
-
     "RA Area A4C",
-
     "RVd A4C",
     "TV S'",
     "TAPSE",
@@ -36,7 +37,6 @@ const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "e' med MV Ann",
     "E/e' Med Ratio",
     "E/e' Averaged",
-    "Decel Time",
     "LA Vol A4C A/L",
     "LA Vol A2C A/L",
     "LA Vol BP A/L",
@@ -46,15 +46,23 @@ const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "MV Max Vel",
     "MV Pk Grad",
     "MV Mean Grad",
+    "MV Area, PHT",
+    "AoV Vmax",
+    "LVOT Vmax",
+    "AoV Area, Vmax",
+    "AoV Peak PG",
+    "LVOT VTI",
+    "AoV VTI",
+    "AoV Area, VTI",
+    "AoV Mean PG",
     "LVOT Diameter",
     "Dimensionless index VTI",
     "Dimensionless index Vmax",
     "TR Max Velocity",
 };
 
-const int KEY_TEXT_SIZE = 13;
+const int KEY_TEXT_SIZE = 12;
 const std::string KEY_TEXT[KEY_TEXT_SIZE] = {
-    "Technical Comments",
     "Left Ventricle",
     "Right Ventricle",
     "Aortic Valve",
