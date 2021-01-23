@@ -10,6 +10,7 @@ void insertText(std::string *text, const xlsxiowriter *handle);
 void extractText(std::string *text, const std::string &line);
 void insertVals(double *values, const xlsxiowriter *handle);
 void extractVals(double *values, const std::string &line);
-void getMRN(duckx::Paragraph mrnParagraph, const xlsxiowriter *handle);
+double cleanAndConvertVal(std::string entry);
+void setMRN(duckx::Paragraph mrnParagraph, const xlsxiowriter *handle);
 
 #endif // ECHO_H
