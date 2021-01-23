@@ -11,6 +11,9 @@ Parses and extracts data from echocardiography reports (in *docx format) to an E
 * `./EchoParse`
 * Open the generated `output.xlsx` file in `output/`
 
+## Improvements to make
+* Replace KEY_VALS and KEY_TEXT with hash tables
+
 ## Expected format of echocardiography reports
 
 ...
