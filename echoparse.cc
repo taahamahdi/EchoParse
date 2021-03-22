@@ -1,115 +1,209 @@
-#include <iostream>
-#include <filesystem>
-#include <string>
-#include <sstream>
-#include <vector>
 #include <algorithm>
-#include <bits/stdc++.h>
+#include <array>
 #include <assert.h>
+#include <bits/stdc++.h>
+#include <filesystem>
+#include <iostream>
+#include <sstream>
+#include <string>
 
-#include "echoparse.h"
+#include "EchoParse.h"
+#include "FilePair.h"
 
-#include "libs/xlsxio/include/xlsxio_write.h"
 #include "libs/duckx.hpp"
+#include "libs/xlsxio/include/xlsxio_write.h"
 
 using namespace std;
 
 int main() {
-    const string OUTPUT_FILE_NAME = "output/output.xlsx";
-    const string INPUT_DOCS_PATH = "input_docs";
-
     xlsxiowriter *handle = new xlsxiowriter;
-    if ((*handle = xlsxiowrite_open(OUTPUT_FILE_NAME.c_str(), "MySheet")) == NULL) {
+    if ((*handle = xlsxiowrite_open(OUTPUT_FILE_NAME.c_str(), "MySheet")) ==
+        NULL) {
         cerr << "Error creating .xlsx file" << endl;
         return 1;
     }
 
-    xlsxiowrite_add_column(*handle, "MRN", 7);
-    for (const auto &columnName: KEY_VALS) {
-        xlsxiowrite_add_column(*handle, columnName.c_str(), columnName.length());
+    addLabels(handle);
+
+    cout << "Reading from:" << endl;
+
+    map<int, FilePair> files;
+    generateFileMap(files);
+
+    for (auto mapIt = files.cbegin(); mapIt != files.cend(); ++mapIt) {
+        if (filesystem::exists(mapIt->second.pre)) {
+            processFile(handle, mapIt->second.pre, FilePairType::PRE);
+        } else {
+            for (int i = 0; i < KEY_VAL_SIZE + KEY_TEXT_SIZE + 7; i++) {
+                // Skip to post section
+                xlsxiowrite_add_cell_string(*handle, "");
+            }
+        }
+
+        if (filesystem::exists(mapIt->second.post)) {
+            processFile(handle, mapIt->second.post, FilePairType::POST);
+        } else {
+            xlsxiowrite_next_row(*handle);
+        }
     }
-    for (const auto &columnName: KEY_TEXT) {
-        xlsxiowrite_add_column(*handle, columnName.c_str(), columnName.length() * 3);
+    xlsxiowrite_close(*handle);
+}
+
+void addLabels(const xlsxiowriter *handle) {
+    xlsxiowrite_add_column(*handle, "PRE", 10);
+    xlsxiowrite_add_column(*handle, "MRN", 7);
+    xlsxiowrite_add_column(*handle, "Test Date", 10);
+    xlsxiowrite_add_column(*handle, "Age", 3);
+    xlsxiowrite_add_column(*handle, "Heart Rate", 10);
+    xlsxiowrite_add_column(*handle, "Rhythm", 10);
+    xlsxiowrite_add_column(*handle, "Blood Pressure", 14);
+    for (const auto &columnName : KEY_VALS) {
+        xlsxiowrite_add_column(*handle, columnName.c_str(),
+                               columnName.length());
+    }
+    for (const auto &columnName : KEY_TEXT) {
+        xlsxiowrite_add_column(*handle, columnName.c_str(),
+                               columnName.length() * 3);
+    }
+
+    xlsxiowrite_add_column(*handle, "POST", 10);
+    xlsxiowrite_add_column(*handle, "Test Date", 10);
+    xlsxiowrite_add_column(*handle, "Age", 3);
+    xlsxiowrite_add_column(*handle, "Heart Rate", 10);
+    xlsxiowrite_add_column(*handle, "Rhythm", 10);
+    xlsxiowrite_add_column(*handle, "Blood Pressure", 14);
+    for (const auto &columnName : KEY_VALS) {
+        xlsxiowrite_add_column(*handle, columnName.c_str(),
+                               columnName.length());
+    }
+    for (const auto &columnName : KEY_TEXT) {
+        xlsxiowrite_add_column(*handle, columnName.c_str(),
+                               columnName.length() * 3);
     }
 
     xlsxiowrite_next_row(*handle);
+}
 
-    cout << "Reading from:" << endl;
+void generateFileMap(map<int, FilePair> &files) {
     for (const auto &file : filesystem::directory_iterator(INPUT_DOCS_PATH)) {
-        cout << file.path();
+        const string filename = file.path().stem();
+        const int usPos = filename.find("_");
+        const int id = stoi(filename.substr(0, usPos));
+        const string preOrPost =
+            filename.substr(usPos + 1, filename.find(".") - usPos);
+        FilePairType pairType =
+            (preOrPost == "pre" ? FilePairType::PRE : FilePairType::POST);
 
-        double *values = new double[KEY_VAL_SIZE];
-        fill_n(values, KEY_VAL_SIZE, INT_MIN);
+        if (files.count(id) == 1) {
+            files[id].addFile(file, pairType);
+        } else {
+            const filesystem::path nonExistentFile{};
+            files[id] = FilePair{
+                pairType == FilePairType::PRE ? file : nonExistentFile,
+                pairType == FilePairType::POST ? file : nonExistentFile};
+        }
+    }
+}
 
-        string *text = new string[KEY_TEXT_SIZE];
+void processFile(xlsxiowriter *handle, filesystem::path file,
+                 FilePairType pairType) {
+    cout << file << endl;
 
-        duckx::Document doc(file.path());
-        doc.open();
+    array<double, KEY_VAL_SIZE> values;
+    fill_n(values.begin(), KEY_VAL_SIZE, INT_MIN);
 
-        duckx::Paragraph mrnParagraph;
+    array<string, KEY_TEXT_SIZE> text;
 
-        bool pastMeasurements = false;
-        string line = "";
-        string multiLine = "";
-        for (auto p : doc.paragraphs()) {
-            for (auto r : p.runs()) {
-                if (r.get_text().find("MRN") != string::npos) {
-                    mrnParagraph = p;
+    duckx::Document doc(file);
+    doc.open();
+
+    duckx::Paragraph mrnParagraph, testDateParagraph, ageParagraph,
+        rhythmHeartRateBloodPressureParagraph;
+
+    bool pastMeasurements = false;
+    string line = "";
+    string multiLine = "";
+    string testDate = "";
+    for (auto p : doc.paragraphs()) {
+        for (auto r : p.runs()) {
+            if (r.get_text() == "Measurements" ||
+                r.get_text() == "MEASUREMENTS AND CALCULATIONS:") {
+                pastMeasurements = true;
+            } else if (r.get_text().find("MRN") != string::npos) {
+                mrnParagraph = p;
+            } else if (r.get_text().find("Age") != string::npos) {
+                ageParagraph = p;
+            } else if (r.get_text().find("Rhythm") != string::npos) {
+                rhythmHeartRateBloodPressureParagraph = p;
+            } else if (r.get_text() == "Test ") {
+                testDate += "Test ";
+            } else if (r.get_text() == "Date :") {
+                if (testDate == "Test ") {
+                    testDate += "Date :";
                 }
-                if (r.get_text() == "Measurements" || r.get_text() == "MEASUREMENTS AND CALCULATIONS:") {
-                    pastMeasurements = true;
-                }
+            } else if (testDate == "Test Date :") {
+                testDate = "FOUND";
+            } else if (testDate == "FOUND") {
+                testDateParagraph = p;
+                testDate = "";
             }
-            if (pastMeasurements) {
+        }
+        if (pastMeasurements) {
+            line = "";
+        } else if (p.runs().get_text().length() > 0) {
+            const char startLineChar = p.runs().get_text().at(0);
+            // Assumption: A new line begins when the starting character of
+            // that line is uppercase. Reasoning: Some lines in the docx
+            // file have unexpected paragraph breaks in random parts of a
+            // KEY_TEXT entry.
+            if (startLineChar >= 'A' && startLineChar <= 'Z') {
                 line = "";
-            } else if (p.runs().get_text().length() > 0) {
-                const char startLineChar = p.runs().get_text().at(0);
-                // Assumption: A new line begins when the starting character of that line is uppercase.
-                // Reasoning: Some lines in the docx file have unexpected paragraph breaks in random parts
-                // of a KEY_TEXT entry.
-                if (startLineChar >= 'A' && startLineChar <= 'Z') {
-                    line = "";
-                }
             }
-            for (auto r : p.runs()) {
-                line.append(r.get_text());
-            }
+        }
+        for (auto r : p.runs()) {
+            line.append(r.get_text());
+        }
+        const string proxToFind = "ProxAsc Aorta";
+        const auto proxPos = line.find(proxToFind);
+        if (proxPos != string::npos) {
+            line.replace(proxPos, proxToFind.length() + 1, "Prox Asc Aorta");
+        }
+        if (!pastMeasurements) {
+            extractText(text, line);
+        } else {
             // To store multiLine entries (example shown below):
             //
             // LV Mass
             // indexed
             // [value]
             //
-            // We store each line, but only reset when our current line
-            // contains a KEY_VAL. In the case of a [value] at the start of the line, we
-            // skip this step (and thus end up resetting the line afterwards)
-            if (any_of(begin(KEY_VALS), end(KEY_VALS), [line](string val) {
-                        return line.find(val) != string::npos;
-                        }
-                    )
-               ) {
-                multiLine = "";
-            }
+            // We store each line, but only reset when
+            // our current line is accepted by extractVals or
+            // a multiLine is accepted below (in the else clause)
             multiLine += multiLine.length() == 0 ? line : " " + line;
-            if (!pastMeasurements) {
-                extractText(text, line);
+            if (extractVals(values, line)) {
+                multiLine = "";
             } else {
-                extractVals(values, line);
-                // [value] is at the start of the line and multiLine isn't empty
+                // [value] is at the start of the line and multiLine isn't
+                // empty
                 // => use multiLine as the KEY_VAL name and store [value]
-                if (multiLine.length() > 0 && line.length() > 0 && isdigit(line.at(0))) {
+                if (multiLine.length() > 0 && line.length() > 0 &&
+                    isdigit(line.at(0))) {
                     for (int i = 0; i < KEY_VAL_SIZE; i++) {
                         const auto indexFound = multiLine.find(KEY_VALS[i]);
                         if (indexFound != string::npos) {
-                            // If keyValPlusOne matches in KEY_VALS, we know something longer is in
-                            // KEY_VALS. Continue for full match
-                            const string keyValPlusOne = multiLine.substr(indexFound, KEY_VALS[i].length() + 1);
-                            if (any_of(begin(KEY_VALS), end(KEY_VALS), [keyValPlusOne](string val) {
-                                        return val.find(keyValPlusOne) != string::npos;
-                                        })) {
+                            // If keyValPlusOne matches in KEY_VALS, we know
+                            // something longer is in KEY_VALS. Continue for
+                            // full match (greedy matching)
+                            const string keyValPlusOne = multiLine.substr(
+                                indexFound, KEY_VALS[i].length() + 1);
+                            if (any_of(begin(KEY_VALS), end(KEY_VALS),
+                                       [keyValPlusOne](string val) {
+                                           return val.find(keyValPlusOne) !=
+                                                  string::npos;
+                                       })) {
                                 continue;
-                            }
-                            else {
+                            } else {
                                 values[i] = cleanAndConvertVal(line);
                                 multiLine = "";
                                 break;
@@ -119,47 +213,63 @@ int main() {
                 }
             }
         }
+    }
 
+    // Skip over "PRE/POST" label
+    xlsxiowrite_add_cell_string(*handle, "");
+
+    cout << "\tMRN: " << getCleanEntry(mrnParagraph) << endl;
+    if (pairType == FilePairType::PRE) {
         setMRN(mrnParagraph, handle);
+    }
+    setTestDate(testDateParagraph, handle);
+    setAge(ageParagraph, handle);
+    setRhythmHeartRateBloodPressure(rhythmHeartRateBloodPressureParagraph,
+                                    handle);
 
-        insertVals(values, handle);
-        insertText(text, handle);
-        delete[] values;
-        delete[] text;
+    insertVals(values, handle);
+    insertText(text, handle);
+    if (pairType == FilePairType::POST) {
         xlsxiowrite_next_row(*handle);
+        cout << endl;
     }
-    xlsxiowrite_close(*handle);
 }
 
-void insertText(string *text, const xlsxiowriter *handle) {
+void insertText(array<string, KEY_TEXT_SIZE> &text,
+                const xlsxiowriter *handle) {
     for (int i = 0; i < KEY_TEXT_SIZE; i++) {
-        xlsxiowrite_add_cell_string(*handle, text[i].c_str());
+        if (text.at(i) != "") {
+            xlsxiowrite_add_cell_string(*handle, text.at(i).c_str());
+        } else {
+            xlsxiowrite_add_cell_string(*handle, "[missing]");
+        }
     }
 }
 
-void extractText(string *text, const string &line) {
+void extractText(array<string, KEY_TEXT_SIZE> &text, const string &line) {
     for (int i = 0; i < KEY_TEXT_SIZE; i++) {
         // Look only if KEY_TEXT is at start of line
         if (line.find(KEY_TEXT[i]) == 0) {
             // Store the line excluding the keyText name
             // + 2 (colon and space that follow)
             string entry = line.substr(KEY_TEXT[i].length() + 2);
-            text[i] = entry;
+            text.at(i) = entry;
         }
     }
 }
 
-void insertVals(double *values, const xlsxiowriter *handle) {
+void insertVals(array<double, KEY_VAL_SIZE> &values,
+                const xlsxiowriter *handle) {
     for (int i = 0; i < KEY_VAL_SIZE; i++) {
-        if (values[i] != INT_MIN) {
-            xlsxiowrite_add_cell_float(*handle, values[i]);
+        if (values.at(i) != INT_MIN) {
+            xlsxiowrite_add_cell_float(*handle, values.at(i));
         } else {
-            xlsxiowrite_add_cell_string(*handle, "missing");
+            xlsxiowrite_add_cell_string(*handle, "[missing]");
         }
     }
 }
 
-void extractVals(double *values, const string &line) {
+bool extractVals(array<double, KEY_VAL_SIZE> &values, const string &line) {
     for (int i = 0; i < KEY_VAL_SIZE; i++) {
         if (line.find(KEY_VALS[i]) != string::npos) {
             // Store the line excluding the keyVal name
@@ -169,21 +279,26 @@ void extractVals(double *values, const string &line) {
             }
             if (entry.substr(0, entry.find(':')).length() > 0) {
                 // If there is more beyond the keyVal we detected,
-                // see if KEY_VALS[i] combined with text up to ':' is another keyVal
-                const string longerKeyVal = KEY_VALS[i] + entry.substr(0, entry.find(':'));
+                // see if KEY_VALS[i] combined with text up to ':' is another
+                // keyVal
+                const string longerKeyVal =
+                    KEY_VALS[i] + entry.substr(0, entry.find(':'));
 
-                // If there is, ignore this keyVal match (we are only interested in a full match)
-                if (find(begin(KEY_VALS), end(KEY_VALS), longerKeyVal) != end(KEY_VALS)) {
+                // If there is, ignore this keyVal match (we are only interested
+                // in a full match)
+                if (std::find(begin(KEY_VALS), end(KEY_VALS), longerKeyVal) !=
+                    end(KEY_VALS)) {
                     continue;
                 }
             }
             // Remove beginning whitespace
             entry.erase(0, 1);
 
-            values[i] = cleanAndConvertVal(entry);
-            break;
+            values.at(i) = cleanAndConvertVal(entry);
+            return true;
         }
     }
+    return false;
 }
 
 double cleanAndConvertVal(string entry) {
@@ -205,24 +320,84 @@ double cleanAndConvertVal(string entry) {
     return value;
 }
 
-void setMRN(duckx::Paragraph mrnParagraph, const xlsxiowriter *handle) {
-    string mrn = "";
-    for (auto r : mrnParagraph.runs()) {
-        mrn.append(r.get_text());
-    }
-
-    // Remove any garbage before MRN (such as name)
-    size_t i = 0;
-    for (; i < mrn.length(); i++ ) {
-        if (isdigit(mrn.at(i))) {
-            break;
-        }
-    }
-    // Find first digit, remove everything before
-    mrn = mrn.substr(i, mrn.length() - i);
-    cout << "\tMRN: " << mrn << endl;
+void setMRN(const duckx::Paragraph &mrnParagraph, const xlsxiowriter *handle) {
+    const string mrn = getCleanEntry(mrnParagraph);
     assert(mrn.length() == 7);
 
     int id = atoi(mrn.c_str());
     xlsxiowrite_add_cell_float(*handle, id);
+}
+
+void setTestDate(duckx::Paragraph testDateParagraph,
+                 const xlsxiowriter *handle) {
+    string val = "";
+    for (const auto &r : testDateParagraph.runs()) {
+        val.append(r.get_text());
+    }
+    const string date = getCleanEntry(testDateParagraph);
+    // assert(date.length() == 10);
+    xlsxiowrite_add_cell_string(*handle, date.c_str());
+}
+
+void setAge(const duckx::Paragraph &ageParagraph, const xlsxiowriter *handle) {
+    const string ageStr = getCleanEntry(ageParagraph);
+    int age = convertFirstNum(ageStr);
+    assert(to_string(age).length() <= 3);
+    assert(age > 0);
+
+    xlsxiowrite_add_cell_int(*handle, age);
+}
+
+void setRhythmHeartRateBloodPressure(
+    duckx::Paragraph rhythmHeartRateBloodPressureParagraph,
+    const xlsxiowriter *handle) {
+    string line = "";
+    for (auto r : rhythmHeartRateBloodPressureParagraph.runs()) {
+        line.append(r.get_text());
+    }
+    const string RHYTHM = "Rhythm", HEART_RATE = "Heart Rate",
+                 BLOOD_PRESSURE = "Blood Pressure";
+
+    line = line.substr(line.find(RHYTHM) + RHYTHM.length() + 1);
+    const string rhythmStr = line.substr(0, line.find(HEART_RATE) - 1);
+    xlsxiowrite_add_cell_string(*handle, rhythmStr.c_str());
+
+    const string hrStr =
+        line.substr(line.find(HEART_RATE) - 1,
+                    line.find(BLOOD_PRESSURE) - line.find(HEART_RATE));
+    xlsxiowrite_add_cell_int(*handle, convertFirstNum(removeTextLabel(hrStr)));
+
+    string bpStr = line.substr(line.find(BLOOD_PRESSURE));
+    stringstream bpss{removeTextLabel(bpStr)};
+
+    // Remove units
+    bpss >> bpStr;
+    xlsxiowrite_add_cell_string(*handle, bpStr.c_str());
+}
+
+string removeTextLabel(string s) {
+    for (size_t i = 0; i < s.length(); i++) {
+        if (isdigit(s.at(i))) {
+            // Find first digit, remove everything before
+            s = s.substr(i);
+            break;
+        }
+    }
+    return s;
+}
+
+string getCleanEntry(duckx::Paragraph paragraph) {
+    string value = "";
+    for (auto r : paragraph.runs()) {
+        value.append(r.get_text());
+    }
+
+    return removeTextLabel(value);
+}
+
+int convertFirstNum(string s) {
+    stringstream ss{s};
+    int val;
+    ss >> val;
+    return val;
 }

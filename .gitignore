@@ -1,2 +1,7 @@
 input_docs/
 output/
+EchoParse
+EchoParse.d
+EchoParse.o
+FilePair.d
+FilePair.o

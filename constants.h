@@ -3,7 +3,10 @@
 
 #include <string>
 
-const int KEY_VAL_SIZE = 54;
+const std::string OUTPUT_FILE_NAME = "output/output.xlsx";
+const std::string INPUT_DOCS_PATH = "input_docs";
+
+const int KEY_VAL_SIZE = 55;
 const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "IVSd",
     "LVPWd",
@@ -22,7 +25,8 @@ const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "SV LVOT",
     "Aortic Sinuses",
     "Aortic Sinuses index",
-    "Prox Asc Aorta",
+    "Prox Asc Aorta", // Hard-coded "ProxAsc Aorta" to this, appears as such in some files
+    // TODO(taahamahdi): Find generalized solution
     "Left Atrium (2D)",
     "RA Area A4C",
     "RVd A4C",
@@ -43,6 +47,7 @@ const std::string KEY_VALS[KEY_VAL_SIZE] = {
     "LA VOL A/L index",
     "PV S",
     "PV D",
+    "PV A",
     "MV Max Vel",
     "MV Pk Grad",
     "MV Mean Grad",

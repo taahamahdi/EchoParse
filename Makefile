@@ -3,7 +3,7 @@ CXXFLAGS = --std=c++17 -Wall -MMD -g
 SUBDIRS = duckx minizip
 INCLUDES = -I./libs/duckx/include -I./libs/xlsxio/include -I./libs/xlsxio/lib
 LIBRARIES = -L./libs/duckx/build -L./libs/xlsxio
-OBJECTS = echoparse.o
+OBJECTS = FilePair.o EchoParse.o
 DEPENDS = ${OBJECTS:.o=.d}
 EXEC = EchoParse
 
