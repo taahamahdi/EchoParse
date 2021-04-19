@@ -1,5 +1,5 @@
 # EchoParse
-Parses and extracts data from echocardiography reports (in *docx format) to an Excel spreadsheet.
+Parses and extracts data from UHN echocardiography reports (in *docx format) to an Excel spreadsheet. Successfully parsed 781 documents.
 
 ## Build instructions
 * `git submodule update --init --recursive`
@@ -11,9 +11,6 @@ Parses and extracts data from echocardiography reports (in *docx format) to an E
 * Run `make all`
 * `./EchoParse`
 * Open the generated `output.xlsx` file in `output/`
-
-## Improvements to make
-* Replace `KEY_VALS` and `KEY_TEXT` with hash tables
 
 ## Expected format of echocardiography reports
 
