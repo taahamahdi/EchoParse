@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = --std=c++17 -Wall -MMD -g
+CXXFLAGS = --std=c++17 -Wall -MMD -O3
 SUBDIRS = duckx minizip
 INCLUDES = -I./libs/duckx/include -I./libs/xlsxio/include -I./libs/xlsxio/lib
 LIBRARIES = -L./libs/duckx/build -L./libs/xlsxio

@@ -67,6 +67,7 @@ void addLabels(const xlsxiowriter *handle) {
     }
 
     xlsxiowrite_add_column(*handle, "POST", 10);
+    xlsxiowrite_add_column(*handle, "MRN", 7);
     xlsxiowrite_add_column(*handle, "Test Date", 10);
     xlsxiowrite_add_column(*handle, "Age", 3);
     xlsxiowrite_add_column(*handle, "Heart Rate", 10);
@@ -91,8 +92,15 @@ void generateFileMap(map<int, FilePair> &files) {
         const int id = stoi(filename.substr(0, usPos));
         const string preOrPost =
             filename.substr(usPos + 1, filename.find(".") - usPos);
-        FilePairType pairType =
-            (preOrPost == "pre" ? FilePairType::PRE : FilePairType::POST);
+        FilePairType pairType;
+        if (preOrPost == "pre") {
+            pairType = FilePairType::PRE;
+        } else if (preOrPost == "post") {
+            pairType = FilePairType::POST;
+        } else {
+            cout << "Skipping: " << filename << endl;
+            continue;
+        }
 
         if (files.count(id) == 1) {
             files[id].addFile(file, pairType);
@@ -129,9 +137,12 @@ void processFile(xlsxiowriter *handle, filesystem::path file,
             if (r.get_text() == "Measurements" ||
                 r.get_text() == "MEASUREMENTS AND CALCULATIONS:") {
                 pastMeasurements = true;
-            } else if (r.get_text().find("MRN") != string::npos) {
+            } else if (r.get_text().find("MRN") != string::npos ||
+                       r.get_text().find("Med Rec#") != string::npos ||
+                       r.get_text().find("Medical Rec #") != string::npos) {
                 mrnParagraph = p;
-            } else if (r.get_text().find("Age") != string::npos) {
+            } else if (r.get_text().find("Age:") != string::npos ||
+                       r.get_text().find("Age :") != string::npos) {
                 ageParagraph = p;
             } else if (r.get_text().find("Rhythm") != string::npos) {
                 rhythmHeartRateBloodPressureParagraph = p;
@@ -219,9 +230,7 @@ void processFile(xlsxiowriter *handle, filesystem::path file,
     xlsxiowrite_add_cell_string(*handle, "");
 
     cout << "\tMRN: " << getCleanEntry(mrnParagraph) << endl;
-    if (pairType == FilePairType::PRE) {
-        setMRN(mrnParagraph, handle);
-    }
+    setMRN(mrnParagraph, handle);
     setTestDate(testDateParagraph, handle);
     setAge(ageParagraph, handle);
     setRhythmHeartRateBloodPressure(rhythmHeartRateBloodPressureParagraph,
@@ -252,6 +261,11 @@ void extractText(array<string, KEY_TEXT_SIZE> &text, const string &line) {
         if (line.find(KEY_TEXT[i]) == 0) {
             // Store the line excluding the keyText name
             // + 2 (colon and space that follow)
+            if (line.length() < KEY_TEXT[i].length() + 2) {
+                cerr << "Skipping line: " << line << endl;
+                text.at(i) = "";
+                return;
+            }
             string entry = line.substr(KEY_TEXT[i].length() + 2);
             text.at(i) = entry;
         }
@@ -321,11 +335,10 @@ double cleanAndConvertVal(string entry) {
 }
 
 void setMRN(const duckx::Paragraph &mrnParagraph, const xlsxiowriter *handle) {
-    const string mrn = getCleanEntry(mrnParagraph);
-    assert(mrn.length() == 7);
+    const int mrn = convertFirstNum(getCleanEntry(mrnParagraph));
+    assert(to_string(mrn).length() == 7);
 
-    int id = atoi(mrn.c_str());
-    xlsxiowrite_add_cell_float(*handle, id);
+    xlsxiowrite_add_cell_float(*handle, mrn);
 }
 
 void setTestDate(duckx::Paragraph testDateParagraph,
@@ -342,6 +355,10 @@ void setTestDate(duckx::Paragraph testDateParagraph,
 void setAge(const duckx::Paragraph &ageParagraph, const xlsxiowriter *handle) {
     const string ageStr = getCleanEntry(ageParagraph);
     int age = convertFirstNum(ageStr);
+    if (ageStr == "Age:") {
+        xlsxiowrite_add_cell_string(*handle, "");
+        return;
+    }
     assert(to_string(age).length() <= 3);
     assert(age > 0);
 
@@ -358,21 +375,34 @@ void setRhythmHeartRateBloodPressure(
     const string RHYTHM = "Rhythm", HEART_RATE = "Heart Rate",
                  BLOOD_PRESSURE = "Blood Pressure";
 
-    line = line.substr(line.find(RHYTHM) + RHYTHM.length() + 1);
-    const string rhythmStr = line.substr(0, line.find(HEART_RATE) - 1);
-    xlsxiowrite_add_cell_string(*handle, rhythmStr.c_str());
+    if (line.find(RHYTHM) != string::npos) {
+        line = line.substr(line.find(RHYTHM) + RHYTHM.length() + 1);
+        const string rhythmStr = line.substr(0, line.find(HEART_RATE) - 1);
+        xlsxiowrite_add_cell_string(*handle, rhythmStr.c_str());
+    } else {
+        xlsxiowrite_add_cell_string(*handle, "");
+    }
 
-    const string hrStr =
-        line.substr(line.find(HEART_RATE) - 1,
-                    line.find(BLOOD_PRESSURE) - line.find(HEART_RATE));
-    xlsxiowrite_add_cell_int(*handle, convertFirstNum(removeTextLabel(hrStr)));
+    if (line.find(HEART_RATE) != string::npos) {
+        const string hrStr =
+            line.substr(line.find(HEART_RATE) - 1,
+                        line.find(BLOOD_PRESSURE) - line.find(HEART_RATE));
+        xlsxiowrite_add_cell_int(*handle,
+                                 convertFirstNum(removeTextLabel(hrStr)));
+    } else {
+        xlsxiowrite_add_cell_string(*handle, "");
+    }
 
-    string bpStr = line.substr(line.find(BLOOD_PRESSURE));
-    stringstream bpss{removeTextLabel(bpStr)};
+    if (line.find(BLOOD_PRESSURE) != string::npos) {
+        string bpStr = line.substr(line.find(BLOOD_PRESSURE));
+        stringstream bpss{removeTextLabel(bpStr)};
 
-    // Remove units
-    bpss >> bpStr;
-    xlsxiowrite_add_cell_string(*handle, bpStr.c_str());
+        // Remove units
+        bpss >> bpStr;
+        xlsxiowrite_add_cell_string(*handle, bpStr.c_str());
+    } else {
+        xlsxiowrite_add_cell_string(*handle, "");
+    }
 }
 
 string removeTextLabel(string s) {
